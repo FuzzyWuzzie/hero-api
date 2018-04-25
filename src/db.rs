@@ -13,6 +13,11 @@ pub fn initialize(conn: &Connection) -> Result<(), Error> {
         hometown varchar(255) not null,
         age int not null
     )", &[])?;
+    conn.execute("CREATE TABLE users (
+        id integer priamry key,
+        name varchar(255) not null,
+        pass varchar(255) not null
+    )", &[])?;
     println!("Initialized table");
     Ok(())
 }

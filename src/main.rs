@@ -14,8 +14,20 @@ use hero::Hero;
 mod db;
 use std::sync::Mutex;
 
+mod auth;
+use auth::{AuthBasicSuccess, AuthToken};
+
+mod tokens;
+
+#[post("/")]
+fn signin(auth:AuthBasicSuccess)->Json<Value> {
+    Json(json!({
+        "token": tokens::build_token(auth.uid)
+    }))
+}
+
 #[post("/", data="<hero>")]
-fn create(conn: State<db::DBConn>, hero:Json<Hero>)->Json<Hero> {
+fn create(conn: State<db::DBConn>, hero:Json<Hero>, _auth: AuthToken)->Json<Hero> {
     let conn = conn.lock()
         .expect("db connection lock");
     Json(Hero::create(&conn, Hero { id: None, ..hero.into_inner() }))
@@ -36,14 +48,14 @@ fn read_single(conn: State<db::DBConn>, id:i32) -> Json<Hero> {
 }
 
 #[put("/<id>", data="<hero>")]
-fn update(conn: State<db::DBConn>, id:i32, hero:Json<Hero>)->Json<Hero> {
+fn update(conn: State<db::DBConn>, id:i32, hero:Json<Hero>, _auth: AuthToken)->Json<Hero> {
     let conn = conn.lock()
         .expect("db connection lock");
     Json(Hero::update(&conn, id, &hero))
 }
 
 #[delete("/<id>")]
-fn delete(conn: State<db::DBConn>, id:i32)->Json<Value> {
+fn delete(conn: State<db::DBConn>, id:i32, _auth: AuthToken)->Json<Value> {
     let conn = conn.lock()
         .expect("db connection lock");
     let status:bool = Hero::delete(&conn, id);
@@ -65,6 +77,7 @@ fn main() {
 
     rocket::ignite()
         .manage(Mutex::new(conn))
+        .mount("/auth", routes![signin])
         .mount("/hero", routes![create, read_single, update, delete])
         .mount("/heroes", routes![read])
         .launch();
