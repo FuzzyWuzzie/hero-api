@@ -5,25 +5,30 @@ extern crate rocket;
 extern crate rusqlite;
 #[macro_use] extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
+extern crate toml;
 
 use rocket::State;
 use rocket_contrib::{Json, Value};
-
 mod hero;
 use hero::Hero;
+use std::sync::Mutex;
+use std::fs::File;
+use std::io::prelude::*;
 
 mod db;
-use std::sync::Mutex;
-
 mod auth;
+mod tokens;
 use auth::{AuthBasicSuccess, AuthToken, IsAdmin};
 
-mod tokens;
+#[derive(Deserialize)]
+struct Config {
+    secret:String
+}
 
 #[get("/")]
-fn signin(auth:AuthBasicSuccess)->Json<Value> {
+fn signin(config:State<Config>, auth:AuthBasicSuccess)->Json<Value> {
     Json(json!({
-        "token": tokens::build_token(auth.uid, auth.adm)
+        "token": tokens::build_token(&config.secret, auth.uid, auth.adm)
     }))
 }
 
@@ -83,6 +88,30 @@ fn delete(conn: State<db::DBConn>, id:i32, _auth: AuthToken)->Json<Value> {
 }
 
 fn main() {
+    let mut config_file = match File::open("config.toml") {
+        Ok(f) => f,
+        Err(_) => {
+            println!("Could not open config.toml!");
+            return;
+        }
+    };
+    let mut contents = String::new();
+    match config_file.read_to_string(&mut contents) {
+        Ok(_) => (),
+        Err(_) => {
+            println!("Could not read contents of config.toml!");
+            return;
+        }
+    };
+
+    let config:Config = match toml::from_str(&contents) {
+        Ok(c) => c,
+        Err(_) => {
+            println!("Could not parse config.toml!");
+            return;
+        }
+    };
+
     let conn = db::get_connection("heroes.db")
         .expect("open database");
     match db::initialize(&conn) {
@@ -94,6 +123,7 @@ fn main() {
     
 
     rocket::ignite()
+        .manage(config)
         .manage(Mutex::new(conn))
         .mount("/auth", routes![signin, create_user])
         .mount("/hero", routes![create, read_single, update, delete])

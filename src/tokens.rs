@@ -10,23 +10,23 @@ struct Claims {
     adm:bool
 }
 
-pub fn build_token(uid:u32, adm:bool)->String {
+pub fn build_token(secret:&str, uid:u32, adm:bool)->String {
     let claims = Claims {
         iss: "hero-api".to_owned(),
         uid,
         adm
     };
 
-    let token = encode(&Header::default(), &claims, "my super secret".as_ref()).unwrap();
+    let token = encode(&Header::default(), &claims, secret.as_bytes()).unwrap();
     token
 }
 
-pub fn validate_token(token:&str)->Result<AuthToken, ()> {
+pub fn validate_token(secret:&str, token:&str)->Result<AuthToken, ()> {
     let validation = Validation {
         iss: Some("hero-api".to_string()),
         ..Default::default()
     };
-    let tok = decode::<Claims>(&token, "my super secret".as_ref(), &validation);
+    let tok = decode::<Claims>(&token, secret.as_bytes(), &validation);
 
     match tok {
         Ok(derp) => Ok(AuthToken {

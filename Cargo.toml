@@ -12,6 +12,7 @@ serde_derive = "1.0"
 jsonwebtoken = "2.0.3"
 base64 = "0.9.1"
 bcrypt = "0.2.0"
+toml = "0.4.6"
 
 [dependencies.rocket_contrib]
 version = "*"

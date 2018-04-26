@@ -41,7 +41,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthToken {
         }
         let token = auth[1];
 
-        let token = match tokens::validate_token(&token) {
+        let config = request.guard::<State<super::Config>>()?;
+        let token = match tokens::validate_token(&config.secret, &token) {
             Ok(tok) => tok,
             Err(_) => {
                 println!("Invalid token!");
