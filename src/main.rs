@@ -2,6 +2,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate rocket;
+extern crate rusqlite;
 #[macro_use] extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
@@ -15,14 +16,31 @@ mod db;
 use std::sync::Mutex;
 
 mod auth;
-use auth::{AuthBasicSuccess, AuthToken};
+use auth::{AuthBasicSuccess, AuthToken, IsAdmin};
 
 mod tokens;
 
-#[post("/")]
+#[get("/")]
 fn signin(auth:AuthBasicSuccess)->Json<Value> {
     Json(json!({
-        "token": tokens::build_token(auth.uid)
+        "token": tokens::build_token(auth.uid, auth.adm)
+    }))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Credentials {
+    name:String,
+    pass:String,
+    admin:bool
+}
+
+#[post("/", data="<credentials>")]
+fn create_user(conn: State<db::DBConn>, credentials: Json<Credentials>, _auth: AuthToken, _adm: IsAdmin) -> Json<Value> {
+    let conn = conn.lock()
+        .expect("db connection lock");
+    let uid = auth::register_user(&conn, &credentials.name, &credentials.pass, &credentials.admin).unwrap();
+    Json(json!({
+        "uid": uid
     }))
 }
 
@@ -77,7 +95,7 @@ fn main() {
 
     rocket::ignite()
         .manage(Mutex::new(conn))
-        .mount("/auth", routes![signin])
+        .mount("/auth", routes![signin, create_user])
         .mount("/hero", routes![create, read_single, update, delete])
         .mount("/heroes", routes![read])
         .launch();
